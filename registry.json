@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plugins": [
     {
-      "id": "opencode-free-plugin",
+      "id": "opencode-free",
       "name": "OpenCode Free",
       "description": "Free Claude models via OpenCode (Sonnet 4.7, Haiku 4.5, Opus 4.8, Fable 5). No auth required — Bearer public token.",
       "author": "nhymxu",

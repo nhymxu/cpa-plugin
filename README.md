@@ -32,7 +32,7 @@ plugins:
   store-sources:
     - "https://raw.githubusercontent.com/nhymxu/cpa-plugin/main/registry.json"
   configs:
-    opencode-free-plugin:
+    opencode-free:
       enabled: true
       priority: 1
 ```
@@ -41,7 +41,7 @@ Then install via Management UI or API:
 
 ```bash
 curl -X POST -H "x-api-key: your-key" \
-  http://localhost:8317/v0/management/plugin-store/opencode-free-plugin/install
+  http://localhost:8317/v0/management/plugin-store/opencode-free/install
 ```
 
 ### Manual Install
@@ -50,7 +50,7 @@ Download the zip for your platform from the [latest release](https://github.com/
 
 ```bash
 mkdir -p plugins/darwin/arm64
-unzip opencode-free-plugin_0.1.0_darwin_arm64.zip -d plugins/darwin/arm64/
+unzip opencode-free_0.1.0_darwin_arm64.zip -d plugins/darwin/arm64/
 ```
 
 ## Build
@@ -58,9 +58,9 @@ unzip opencode-free-plugin_0.1.0_darwin_arm64.zip -d plugins/darwin/arm64/
 ```bash
 cd opencode-free
 # macOS ARM64
-go build -buildmode=c-shared -o opencode-free-plugin.dylib .
+go build -buildmode=c-shared -o opencode-free.dylib .
 # Linux AMD64
-GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o opencode-free-plugin.so .
+GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o opencode-free.so .
 ```
 
 ## Release
@@ -68,8 +68,8 @@ GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o opencode-free-plugin.so 
 Releases are automated via GitHub Actions. Push a tag matching `{plugin-id}-{version}`:
 
 ```bash
-git tag opencode-free-plugin-0.1.0
-git push origin opencode-free-plugin-0.1.0
+git tag opencode-free-0.1.0
+git push origin opencode-free-0.1.0
 ```
 
 This triggers a build for 4 platforms (darwin/arm64, darwin/amd64, linux/arm64, linux/amd64) and creates a GitHub release with the packaged artifacts.
