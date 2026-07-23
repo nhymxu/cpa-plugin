@@ -59,7 +59,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -68,6 +70,7 @@ const abiVersion uint32 = 1
 // OpenCode API constants
 const (
 	opencodeBaseURL     = "https://opencode.ai"
+	opencodeModelsURL   = "/zen/v1/models"
 	opencodeChatURL     = "/zen/v1/chat/completions"
 	opencodeMessagesURL = "/zen/v1/messages"
 )
@@ -222,13 +225,76 @@ func cliproxyPluginFree(ptr unsafe.Pointer, len C.size_t) {
 //export cliproxyPluginShutdown
 func cliproxyPluginShutdown() {}
 
-// Model definitions for OpenCode Free
-var opencodeModels = []map[string]any{
-	{"id": "claude-sonnet-4-7-20250507", "name": "claude-sonnet-4-7-20250507", "display_name": "Claude Sonnet 4.7", "object": "model", "owned_by": "anthropic", "type": "chat"},
-	{"id": "claude-sonnet-4-6-20250507", "name": "claude-sonnet-4-6-20250507", "display_name": "Claude Sonnet 4.6", "object": "model", "owned_by": "anthropic", "type": "chat"},
-	{"id": "claude-haiku-4-5-20250507", "name": "claude-haiku-4-5-20250507", "display_name": "Claude Haiku 4.5", "object": "model", "owned_by": "anthropic", "type": "chat"},
-	{"id": "claude-opus-4-8-20250715", "name": "claude-opus-4-8-20250715", "display_name": "Claude Opus 4.8", "object": "model", "owned_by": "anthropic", "type": "chat"},
-	{"id": "claude-fable-5-20250715", "name": "claude-fable-5-20250715", "display_name": "Claude Fable 5", "object": "model", "owned_by": "anthropic", "type": "chat"},
+// Free model IDs that don't end with "-free" suffix
+var knownFreeModels = map[string]bool{
+	"big-pickle": true,
+}
+
+// model cache with 10-minute TTL
+var (
+	cachedModels []map[string]any
+	cacheTime    time.Time
+	cacheMu      sync.Mutex
+)
+
+const modelCacheTTL = 10 * time.Minute
+
+// opencodeModel is a model from the OpenCode /zen/v1/models endpoint.
+type opencodeModel struct {
+	ID string `json:"id"`
+}
+
+// fetchFreeModels fetches models from OpenCode and filters only free ones.
+// Results are cached for 10 minutes to avoid excessive API calls.
+func fetchFreeModels() ([]map[string]any, error) {
+	cacheMu.Lock()
+	if cachedModels != nil && time.Since(cacheTime) < modelCacheTTL {
+		models := cachedModels
+		cacheMu.Unlock()
+		return models, nil
+	}
+	cacheMu.Unlock()
+
+	sendReq := hostHTTPRequest{
+		Method: "GET",
+		URL:    opencodeBaseURL + opencodeModelsURL,
+		Headers: map[string][]string{
+			"Authorization":     {"Bearer public"},
+			"x-opencode-client": {"desktop"},
+			"Accept":            {"application/json"},
+		},
+	}
+
+	resp, err := callHostHTTP(sendReq)
+	if err != nil {
+		return nil, fmt.Errorf("fetch models: %w", err)
+	}
+
+	var models []opencodeModel
+	if err := json.Unmarshal(resp.Body, &models); err != nil {
+		return nil, fmt.Errorf("decode models: %w", err)
+	}
+
+	out := make([]map[string]any, 0)
+	for _, m := range models {
+		if !strings.HasSuffix(m.ID, "-free") && !knownFreeModels[m.ID] {
+			continue
+		}
+		out = append(out, map[string]any{
+			"id":           m.ID,
+			"name":         m.ID,
+			"object":       "model",
+			"owned_by":     "opencode",
+			"type":         "chat",
+		})
+	}
+
+	cacheMu.Lock()
+	cachedModels = out
+	cacheTime = time.Now()
+	cacheMu.Unlock()
+
+	return out, nil
 }
 
 func handleMethod(method string, reqBody []byte) ([]byte, error) {
@@ -280,9 +346,9 @@ func handleRegister() ([]byte, error) {
 		SchemaVersion: 1,
 		Metadata: metadata{
 			Name:             "opencode-free",
-			Version:          "0.1.0",
+			Version:          "0.1.1",
 			Author:           "nhymxu",
-			GitHubRepository: "https://github.com/nhymxu/cpa-opencode-free",
+			GitHubRepository: "https://github.com/nhymxu/cpa-plugin",
 			Logo:             "",
 			ConfigFields:     nil,
 		},
@@ -303,13 +369,16 @@ func handleRegister() ([]byte, error) {
 }
 
 func handleModelRegister() ([]byte, error) {
-	modelsJSON, _ := json.Marshal(opencodeModels)
+	models, err := fetchFreeModels()
+	if err != nil {
+		return nil, fmt.Errorf("model.register: %w", err)
+	}
+	modelsJSON, _ := json.Marshal(models)
 	return okEnvelopeJSON(`{"provider":"opencode-free","models":` + string(modelsJSON) + `}`)
 }
 
 func handleModelStatic() ([]byte, error) {
-	modelsJSON, _ := json.Marshal(opencodeModels)
-	return okEnvelopeJSON(`{"provider":"opencode-free","models":` + string(modelsJSON) + `}`)
+	return handleModelRegister()
 }
 
 func handleModelForAuth() ([]byte, error) {
