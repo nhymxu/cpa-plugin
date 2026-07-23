@@ -10,7 +10,7 @@
       "repository": "https://github.com/nhymxu/cpa-plugin",
       "homepage": "https://github.com/nhymxu/cpa-plugin",
       "license": "MIT",
-      "tags": ["free", "claude", "opencode"]
+      "tags": ["free", "opencode", "provider"]
     }
   ]
 }
