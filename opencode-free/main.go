@@ -345,7 +345,7 @@ func handleRegister() ([]byte, error) {
 		SchemaVersion: 1,
 		Metadata: metadata{
 			Name:             "opencode-free",
-			Version:          "0.1.1",
+			Version:          "0.1.2",
 			Author:           "nhymxu",
 			GitHubRepository: "https://github.com/nhymxu/cpa-plugin",
 			Logo:             "",
