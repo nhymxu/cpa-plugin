@@ -9,18 +9,20 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func main() {
 	libraryPath := flag.String("library", "", "path to the compiled plugin library")
 	archivePath := flag.String("archive", "", "path to the output zip archive")
 	checksumPath := flag.String("checksum", "", "path to the output checksum file")
+	version := flag.String("version", "", "plugin version (e.g., v0.1.1)")
 	flag.Parse()
 
-	if *libraryPath == "" || *archivePath == "" || *checksumPath == "" {
-		fatalf("library, archive, and checksum are required")
+	if *libraryPath == "" || *archivePath == "" || *checksumPath == "" || *version == "" {
+		fatalf("library, archive, checksum, and version are required")
 	}
-	archiveData, errPackage := packageLibrary(*libraryPath, *archivePath)
+	archiveData, errPackage := packageLibrary(*libraryPath, *archivePath, *version)
 	if errPackage != nil {
 		fatalf("%v", errPackage)
 	}
@@ -31,7 +33,7 @@ func main() {
 	}
 }
 
-func packageLibrary(libraryPath, archivePath string) ([]byte, error) {
+func packageLibrary(libraryPath, archivePath, version string) ([]byte, error) {
 	library, errOpen := os.Open(libraryPath)
 	if errOpen != nil {
 		return nil, fmt.Errorf("open library: %w", errOpen)
@@ -60,11 +62,17 @@ func packageLibrary(libraryPath, archivePath string) ([]byte, error) {
 	}()
 
 	writer := zip.NewWriter(archive)
+	baseName := filepath.Base(libraryPath)
+	ext := filepath.Ext(baseName)
+	nameWithoutExt := strings.TrimSuffix(baseName, ext)
+	versionClean := strings.TrimPrefix(version, "v")
+	entryName := fmt.Sprintf("%s-v%s%s", nameWithoutExt, versionClean, ext)
+
 	header, errHeader := zip.FileInfoHeader(info)
 	if errHeader != nil {
 		return nil, fmt.Errorf("create zip header: %w", errHeader)
 	}
-	header.Name = filepath.Base(libraryPath)
+	header.Name = entryName
 	header.Method = zip.Deflate
 	header.SetMode(0o755)
 	entry, errEntry := writer.CreateHeader(header)

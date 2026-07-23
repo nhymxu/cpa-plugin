@@ -281,11 +281,10 @@ func fetchFreeModels() ([]map[string]any, error) {
 			continue
 		}
 		out = append(out, map[string]any{
-			"id":           m.ID,
-			"name":         m.ID,
-			"object":       "model",
-			"owned_by":     "opencode",
-			"type":         "chat",
+			"ID":      m.ID,
+			"Object":  "model",
+			"OwnedBy": "opencode",
+			"Type":    "chat",
 		})
 	}
 

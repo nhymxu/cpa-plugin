@@ -64,7 +64,8 @@ jobs:
           go run .github/scripts/package-release.go \
             -library "${{ steps.resolve.outputs.plugin_id }}/${{ steps.resolve.outputs.plugin_id }}.${EXT}" \
             -archive "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}" \
-            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256"
+            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256" \
+            -version "${{ steps.resolve.outputs.version }}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -114,7 +115,8 @@ jobs:
           go run .github/scripts/package-release.go \
             -library "${{ steps.resolve.outputs.plugin_id }}/${{ steps.resolve.outputs.plugin_id }}.${EXT}" \
             -archive "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}" \
-            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256"
+            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256" \
+            -version "${{ steps.resolve.outputs.version }}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -155,7 +157,8 @@ jobs:
           go run .github/scripts/package-release.go \
             -library "${{ steps.resolve.outputs.plugin_id }}/${{ steps.resolve.outputs.plugin_id }}.${EXT}" \
             -archive "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}" \
-            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256"
+            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256" \
+            -version "${{ steps.resolve.outputs.version }}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
