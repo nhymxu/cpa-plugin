@@ -1,0 +1,199 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    tags:
+      - "*-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin-dir: [opencode-free]
+    defaults:
+      run:
+        working-directory: ${{ matrix.plugin-dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.plugin-dir }}/go.mod
+      - name: Test and vet
+        run: |
+          go test ./...
+          go vet ./...
+
+  build-linux-amd64:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      EXT: so
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Resolve plugin and version from tag
+        id: resolve
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')"
+          PLUGIN_ID="${TAG%-$VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_id=$PLUGIN_ID" >> "$GITHUB_OUTPUT"
+      - name: Build
+        run: |
+          cd "${{ steps.resolve.outputs.plugin_id }}"
+          go build -trimpath -buildmode=c-shared \
+            -ldflags "-s -w -X main.pluginVersion=${{ steps.resolve.outputs.version }}" \
+            -o "${{ steps.resolve.outputs.plugin_id }}.${EXT}" .
+      - name: Package
+        run: |
+          ARCHIVE_NAME="${{ steps.resolve.outputs.plugin_id }}_${{ steps.resolve.outputs.version }}_${GOOS}_${GOARCH}.zip"
+          mkdir -p "${{ steps.resolve.outputs.plugin_id }}/output"
+          go run .github/scripts/package-release.go \
+            -library "${{ steps.resolve.outputs.plugin_id }}/${{ steps.resolve.outputs.plugin_id }}.${EXT}" \
+            -archive "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}" \
+            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.resolve.outputs.plugin_id }}_linux_amd64
+          path: ${{ steps.resolve.outputs.plugin_id }}/output/
+
+  build-linux-arm64:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    env:
+      TARGET_GOOS: linux
+      TARGET_GOARCH: arm64
+      EXT: so
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Install aarch64 cross-compiler
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-aarch64-linux-gnu
+      - name: Resolve plugin and version from tag
+        id: resolve
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')"
+          PLUGIN_ID="${TAG%-$VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_id=$PLUGIN_ID" >> "$GITHUB_OUTPUT"
+      - name: Build
+        env:
+          GOOS: ${{ env.TARGET_GOOS }}
+          GOARCH: ${{ env.TARGET_GOARCH }}
+          CC: aarch64-linux-gnu-gcc
+          CGO_ENABLED: "1"
+        run: |
+          cd "${{ steps.resolve.outputs.plugin_id }}"
+          go build -trimpath -buildmode=c-shared \
+            -ldflags "-s -w -X main.pluginVersion=${{ steps.resolve.outputs.version }}" \
+            -o "${{ steps.resolve.outputs.plugin_id }}.${EXT}" .
+      - name: Package
+        run: |
+          ARCHIVE_NAME="${{ steps.resolve.outputs.plugin_id }}_${{ steps.resolve.outputs.version }}_${TARGET_GOOS}_${TARGET_GOARCH}.zip"
+          mkdir -p "${{ steps.resolve.outputs.plugin_id }}/output"
+          go run .github/scripts/package-release.go \
+            -library "${{ steps.resolve.outputs.plugin_id }}/${{ steps.resolve.outputs.plugin_id }}.${EXT}" \
+            -archive "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}" \
+            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.resolve.outputs.plugin_id }}_linux_arm64
+          path: ${{ steps.resolve.outputs.plugin_id }}/output/
+
+  build-darwin-arm64:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-latest
+    env:
+      GOOS: darwin
+      GOARCH: arm64
+      EXT: dylib
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Resolve plugin and version from tag
+        id: resolve
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')"
+          PLUGIN_ID="${TAG%-$VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_id=$PLUGIN_ID" >> "$GITHUB_OUTPUT"
+      - name: Build
+        run: |
+          cd "${{ steps.resolve.outputs.plugin_id }}"
+          go build -trimpath -buildmode=c-shared \
+            -ldflags "-s -w -X main.pluginVersion=${{ steps.resolve.outputs.version }}" \
+            -o "${{ steps.resolve.outputs.plugin_id }}.${EXT}" .
+      - name: Package
+        run: |
+          ARCHIVE_NAME="${{ steps.resolve.outputs.plugin_id }}_${{ steps.resolve.outputs.version }}_${GOOS}_${GOARCH}.zip"
+          mkdir -p "${{ steps.resolve.outputs.plugin_id }}/output"
+          go run .github/scripts/package-release.go \
+            -library "${{ steps.resolve.outputs.plugin_id }}/${{ steps.resolve.outputs.plugin_id }}.${EXT}" \
+            -archive "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}" \
+            -checksum "${{ steps.resolve.outputs.plugin_id }}/output/${ARCHIVE_NAME}.sha256"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.resolve.outputs.plugin_id }}_darwin_arm64
+          path: ${{ steps.resolve.outputs.plugin_id }}/output/
+
+  release:
+    needs:
+      - build-linux-amd64
+      - build-linux-arm64
+      - build-darwin-arm64
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Resolve plugin and version from tag
+        id: resolve
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')"
+          PLUGIN_ID="${TAG%-$VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_id=$PLUGIN_ID" >> "$GITHUB_OUTPUT"
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
+          ls -la release-assets/
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${{ steps.resolve.outputs.plugin_id }} ${{ steps.resolve.outputs.version }}" \
+            --notes "Release ${{ steps.resolve.outputs.plugin_id }} version ${{ steps.resolve.outputs.version }}" \
+            --verify-tag \
+            release-assets/*

@@ -6,12 +6,11 @@ A custom plugin store for [CLIProxyAPI](https://github.com/router-for-me/CLIProx
 
 ```
 .
-├── registry.json          # Plugin store manifest (schema_version: 2)
+├── registry.json          # Plugin store manifest (schema_version: 1)
 ├── README.md
 └── opencode-free/         # OpenCode Free plugin source
     ├── main.go            # Go plugin (buildmode=c-shared)
     ├── go.mod
-    └── opencode-free-plugin.dylib  # Prebuilt macOS ARM64
 ```
 
 ## Plugins
@@ -47,15 +46,32 @@ curl -X POST -H "x-api-key: your-key" \
 
 ### Manual Install
 
+Download the zip for your platform from the [latest release](https://github.com/nhymxu/cpa-plugin/releases), unzip, and copy the library to your CLIProxyAPI plugins directory:
+
 ```bash
-# macOS ARM
 mkdir -p plugins/darwin/arm64
-cp opencode-free/opencode-free-plugin.dylib plugins/darwin/arm64/
+unzip opencode-free-plugin_0.1.0_darwin_arm64.zip -d plugins/darwin/arm64/
 ```
 
 ## Build
 
 ```bash
 cd opencode-free
+# macOS ARM64
 go build -buildmode=c-shared -o opencode-free-plugin.dylib .
+# Linux AMD64
+GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o opencode-free-plugin.so .
 ```
+
+## Release
+
+Releases are automated via GitHub Actions. Push a tag matching `{plugin-id}-{version}`:
+
+```bash
+git tag opencode-free-plugin-0.1.0
+git push origin opencode-free-plugin-0.1.0
+```
+
+This triggers a build for 4 platforms (darwin/arm64, darwin/amd64, linux/arm64, linux/amd64) and creates a GitHub release with the packaged artifacts.
+
+When adding a new plugin to this repo, use the same pattern: `{plugin-directory-name}-{semver}`.
