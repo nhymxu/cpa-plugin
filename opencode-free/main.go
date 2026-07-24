@@ -113,10 +113,24 @@ type configField struct {
 type capabilities struct {
 	ModelRegistrar       bool     `json:"model_registrar"`
 	ModelProvider        bool     `json:"model_provider"`
+	ModelRouter          bool     `json:"model_router"`
 	Executor             bool     `json:"executor"`
 	ExecutorModelScope   string   `json:"executor_model_scope"`
 	ExecutorInputFormats []string `json:"executor_input_formats,omitempty"`
 	ExecutorOutputFormats []string `json:"executor_output_formats,omitempty"`
+}
+
+// Model router RPC types. The host marshals pluginapi.ModelRouteRequest/Response
+// verbatim (PascalCase Go field names, no json tags), so field names below must
+// match those exactly.
+type modelRouteRequest struct {
+	RequestedModel string `json:"RequestedModel"`
+}
+
+type modelRouteResponse struct {
+	Handled    bool   `json:"Handled"`
+	TargetKind string `json:"TargetKind,omitempty"`
+	Target     string `json:"Target,omitempty"`
 }
 
 // Executor RPC types
@@ -316,6 +330,8 @@ func handleMethod(method string, reqBody []byte) ([]byte, error) {
 		return handleModelStatic()
 	case "model.for_auth":
 		return handleModelForAuth()
+	case "model.route":
+		return handleModelRoute(reqBody)
 	case "executor.identifier":
 		return okEnvelopeJSON(`{"identifier":"opencode-free"}`)
 	case "executor.execute":
@@ -350,7 +366,7 @@ func handleRegister() ([]byte, error) {
 		SchemaVersion: 1,
 		Metadata: metadata{
 			Name:             "opencode-free",
-			Version:          "0.1.3",
+			Version:          "0.1.4",
 			Author:           "nhymxu",
 			GitHubRepository: "https://github.com/nhymxu/cpa-plugin",
 			Logo:             "",
@@ -359,6 +375,7 @@ func handleRegister() ([]byte, error) {
 		Capabilities: capabilities{
 			ModelRegistrar:       true,
 			ModelProvider:        true,
+			ModelRouter:          true,
 			Executor:             true,
 			ExecutorModelScope:   "both",
 			ExecutorInputFormats: []string{"chat-completions"},
@@ -387,6 +404,40 @@ func handleModelStatic() ([]byte, error) {
 
 func handleModelForAuth() ([]byte, error) {
 	return handleModelRegister()
+}
+
+// handleModelRoute routes requests for our own free models directly to this plugin's
+// executor, bypassing the host's auth scheduler. This provider has no OAuth/login flow
+// and never registers a coreauth.Auth record, so without this router the scheduler would
+// always fail with auth_not_found before our executor ever runs.
+func handleModelRoute(reqBody []byte) ([]byte, error) {
+	var req modelRouteRequest
+	if err := json.Unmarshal(reqBody, &req); err != nil {
+		return nil, fmt.Errorf("decode model.route request: %w", err)
+	}
+
+	models, err := fetchFreeModels()
+	if err != nil {
+		return nil, fmt.Errorf("model.route: %w", err)
+	}
+
+	requested := strings.TrimSpace(req.RequestedModel)
+	for _, m := range models {
+		if id, ok := m["ID"].(string); ok && id == requested {
+			resp := modelRouteResponse{Handled: true, TargetKind: "self"}
+			raw, errMarshal := json.Marshal(resp)
+			if errMarshal != nil {
+				return nil, errMarshal
+			}
+			return okEnvelopeRaw(raw), nil
+		}
+	}
+
+	resp, errMarshal := json.Marshal(modelRouteResponse{Handled: false})
+	if errMarshal != nil {
+		return nil, errMarshal
+	}
+	return okEnvelopeRaw(resp), nil
 }
 
 func handleExecute() ([]byte, error) {
