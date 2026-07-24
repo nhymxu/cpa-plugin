@@ -4,7 +4,7 @@
     {
       "id": "opencode-free",
       "name": "OpenCode Free",
-      "description": "Free Claude models via OpenCode (Sonnet 4.7, Haiku 4.5, Opus 4.8, Fable 5). No auth required — Bearer public token.",
+      "description": "Free models via OpenCode",
       "author": "nhymxu",
       "version": "0.1.5",
       "homepage": "https://github.com/nhymxu/cpa-plugin",
