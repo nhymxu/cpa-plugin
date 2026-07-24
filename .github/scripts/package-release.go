@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func main() {
@@ -22,7 +21,7 @@ func main() {
 	if *libraryPath == "" || *archivePath == "" || *checksumPath == "" || *version == "" {
 		fatalf("library, archive, checksum, and version are required")
 	}
-	archiveData, errPackage := packageLibrary(*libraryPath, *archivePath, *version)
+	archiveData, errPackage := packageLibrary(*libraryPath, *archivePath)
 	if errPackage != nil {
 		fatalf("%v", errPackage)
 	}
@@ -33,7 +32,7 @@ func main() {
 	}
 }
 
-func packageLibrary(libraryPath, archivePath, version string) ([]byte, error) {
+func packageLibrary(libraryPath, archivePath string) ([]byte, error) {
 	library, errOpen := os.Open(libraryPath)
 	if errOpen != nil {
 		return nil, fmt.Errorf("open library: %w", errOpen)
@@ -62,11 +61,7 @@ func packageLibrary(libraryPath, archivePath, version string) ([]byte, error) {
 	}()
 
 	writer := zip.NewWriter(archive)
-	baseName := filepath.Base(libraryPath)
-	ext := filepath.Ext(baseName)
-	nameWithoutExt := strings.TrimSuffix(baseName, ext)
-	versionClean := strings.TrimPrefix(version, "v")
-	entryName := fmt.Sprintf("%s-v%s%s", nameWithoutExt, versionClean, ext)
+	entryName := filepath.Base(libraryPath)
 
 	header, errHeader := zip.FileInfoHeader(info)
 	if errHeader != nil {
