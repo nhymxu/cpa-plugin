@@ -155,7 +155,7 @@ type hostHTTPRequest struct {
 type hostHTTPResponse struct {
 	StatusCode int                 `json:"status_code"`
 	Headers    map[string][]string `json:"headers,omitempty"`
-	Body       json.RawMessage     `json:"body,omitempty"`
+	Body       []byte              `json:"body,omitempty"`
 }
 
 type hostHTTPStreamReadResponse struct {
@@ -244,6 +244,11 @@ type opencodeModel struct {
 	ID string `json:"id"`
 }
 
+// opencodeModelsResponse wraps the /zen/v1/models list payload: {"object":"list","data":[...]}
+type opencodeModelsResponse struct {
+	Data []opencodeModel `json:"data"`
+}
+
 // fetchFreeModels fetches models from OpenCode and filters only free ones.
 // Results are cached for 10 minutes to avoid excessive API calls.
 func fetchFreeModels() ([]map[string]any, error) {
@@ -270,13 +275,13 @@ func fetchFreeModels() ([]map[string]any, error) {
 		return nil, fmt.Errorf("fetch models: %w", err)
 	}
 
-	var models []opencodeModel
-	if err := json.Unmarshal(resp.Body, &models); err != nil {
+	var modelsResp opencodeModelsResponse
+	if err := json.Unmarshal(resp.Body, &modelsResp); err != nil {
 		return nil, fmt.Errorf("decode models: %w", err)
 	}
 
 	out := make([]map[string]any, 0)
-	for _, m := range models {
+	for _, m := range modelsResp.Data {
 		if !strings.HasSuffix(m.ID, "-free") && !knownFreeModels[m.ID] {
 			continue
 		}
@@ -345,7 +350,7 @@ func handleRegister() ([]byte, error) {
 		SchemaVersion: 1,
 		Metadata: metadata{
 			Name:             "opencode-free",
-			Version:          "0.1.2",
+			Version:          "0.1.3",
 			Author:           "nhymxu",
 			GitHubRepository: "https://github.com/nhymxu/cpa-plugin",
 			Logo:             "",
@@ -381,7 +386,7 @@ func handleModelStatic() ([]byte, error) {
 }
 
 func handleModelForAuth() ([]byte, error) {
-	return okEnvelopeJSON(`{"handled":false}`)
+	return handleModelRegister()
 }
 
 func handleExecute() ([]byte, error) {
