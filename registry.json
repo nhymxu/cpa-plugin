@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "plugins": [
     {
       "id": "opencode-free",
@@ -7,10 +7,35 @@
       "description": "Free Claude models via OpenCode (Sonnet 4.7, Haiku 4.5, Opus 4.8, Fable 5). No auth required — Bearer public token.",
       "author": "nhymxu",
       "version": "0.1.5",
-      "repository": "https://github.com/nhymxu/cpa-plugin",
       "homepage": "https://github.com/nhymxu/cpa-plugin",
       "license": "MIT",
-      "tags": ["free", "opencode", "provider"]
+      "tags": ["free", "opencode", "provider"],
+      "install": {
+        "type": "direct",
+        "artifacts": [
+          {
+            "goos": "darwin",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.5/opencode-free_0.1.5_darwin_arm64.zip",
+            "sha256": "5722b11555c7a72891fe857895cc76761aca379b19cc546cbeba5cecaa030b6c",
+            "size": 770749
+          },
+          {
+            "goos": "linux",
+            "goarch": "amd64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.5/opencode-free_0.1.5_linux_amd64.zip",
+            "sha256": "ac8417c885e9244b9e917a50b4906475df81f0fd6eae8e02cf3379af2bd95300",
+            "size": 786340
+          },
+          {
+            "goos": "linux",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.5/opencode-free_0.1.5_linux_arm64.zip",
+            "sha256": "ce74a50d5eaf2abe0a63b800b3c20fe3679329562a4626c6f55b28e1e57f87a0",
+            "size": 735733
+          }
+        ]
+      }
     }
   ]
 }

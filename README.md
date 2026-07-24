@@ -6,7 +6,11 @@ A custom plugin store for [CLIProxyAPI](https://github.com/router-for-me/CLIProx
 
 ```
 .
-├── registry.json          # Plugin store manifest (schema_version: 1)
+├── .github/
+│   └── scripts/
+│       ├── package-release.go  # zips plugin lib + sha256 for release
+│       └── update-registry.go  # updates registry.json with artifact metadata
+├── registry.json          # Plugin store manifest (schema_version: 2, direct install)
 ├── README.md
 ├── Makefile               # version bump / tag / release helpers
 ├── scripts/
@@ -34,10 +38,6 @@ plugins:
   dir: "plugins"
   store-sources:
     - "https://raw.githubusercontent.com/nhymxu/cpa-plugin/main/registry.json"
-  configs:
-    opencode-free:
-      enabled: true
-      priority: 1
 ```
 
 Then install via Management UI or API:
@@ -80,6 +80,8 @@ make release PLUGIN=opencode-free VERSION=0.1.5   # bump + commit + tag + push (
 
 `PLUGIN` defaults to `opencode-free`, so it can be omitted for that plugin. Run `make help` for the full list.
 
-Pushing the tag triggers a build for 4 platforms (darwin/arm64, darwin/amd64, linux/arm64, linux/amd64) and creates a GitHub release with the packaged artifacts.
+Pushing the tag triggers a build for 4 platforms (darwin/arm64, darwin/amd64, linux/arm64, linux/amd64), creates a GitHub release, and **automatically updates `registry.json`** with the new artifact URLs, SHA256 checksums, and sizes for direct install.
 
-When adding a new plugin to this repo, use the same pattern: `{plugin-directory-name}-{semver}`.
+When adding a new plugin to this repo, update the `matrix.plugin-dir` list in `.github/workflows/release.yml` and add its entry to `registry.json` (the CI will fill in the `install.artifacts` section).
+
+> **Note:** If the Management UI still fails with 502 on install, it's a [CLIProxyAPI bug](https://github.com/router-for-me/CLIProxyAPI) where the UI passes the full tag (e.g. `opencode-free-0.1.5`) as the version query param instead of bare semver (`0.1.5`). The workaround is to omit the `version` param entirely — the host auto-resolves the latest release.

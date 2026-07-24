@@ -200,3 +200,32 @@ jobs:
             --notes "Release ${{ steps.resolve.outputs.plugin_id }} version ${{ steps.resolve.outputs.version }}" \
             --verify-tag \
             release-assets/*
+
+      - name: Update registry.json with direct install artifacts
+        run: |
+          go run .github/scripts/update-registry.go \
+            -registry registry.json \
+            -plugin "${{ steps.resolve.outputs.plugin_id }}" \
+            -version "${{ steps.resolve.outputs.version }}" \
+            -scan release-assets/
+
+      - name: Commit and push updated registry.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Fetch the default branch (main) and switch to it
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout "$DEFAULT_BRANCH"
+
+          # Stage and commit the registry update
+          git add registry.json
+          if git diff --cached --quiet; then
+            echo "registry.json unchanged, skipping commit"
+          else
+            git commit -m "chore: update registry.json for ${{ steps.resolve.outputs.plugin_id }} v${{ steps.resolve.outputs.version }}"
+            git push origin "$DEFAULT_BRANCH"
+          fi
