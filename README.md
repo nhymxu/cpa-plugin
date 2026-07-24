@@ -8,6 +8,9 @@ A custom plugin store for [CLIProxyAPI](https://github.com/router-for-me/CLIProx
 .
 ├── registry.json          # Plugin store manifest (schema_version: 1)
 ├── README.md
+├── Makefile               # version bump / tag / release helpers
+├── scripts/
+│   └── bump_version.py    # updates registry.json version field
 └── opencode-free/         # OpenCode Free plugin source
     ├── main.go            # Go plugin (buildmode=c-shared)
     ├── go.mod
@@ -65,13 +68,18 @@ GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o opencode-free.so .
 
 ## Release
 
-Releases are automated via GitHub Actions. Push a tag matching `{plugin-id}-{version}`:
+Releases are automated via GitHub Actions, triggered by pushing a tag matching `{plugin-id}-{version}`.
+
+Use the `Makefile` to bump `registry.json` and cut the tag:
 
 ```bash
-git tag opencode-free-0.1.0
-git push origin opencode-free-0.1.0
+make bump PLUGIN=opencode-free VERSION=0.1.5     # update registry.json only
+make tag PLUGIN=opencode-free VERSION=0.1.5       # bump + create local git tag
+make release PLUGIN=opencode-free VERSION=0.1.5   # bump + commit + tag + push (pushes to remote)
 ```
 
-This triggers a build for 4 platforms (darwin/arm64, darwin/amd64, linux/arm64, linux/amd64) and creates a GitHub release with the packaged artifacts.
+`PLUGIN` defaults to `opencode-free`, so it can be omitted for that plugin. Run `make help` for the full list.
+
+Pushing the tag triggers a build for 4 platforms (darwin/arm64, darwin/amd64, linux/arm64, linux/amd64) and creates a GitHub release with the packaged artifacts.
 
 When adding a new plugin to this repo, use the same pattern: `{plugin-directory-name}-{semver}`.
