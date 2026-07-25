@@ -201,6 +201,10 @@ jobs:
             --verify-tag \
             release-assets/*
 
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
       - name: Update registry.json with direct install artifacts
         run: |
           go run .github/scripts/update-registry.go \
