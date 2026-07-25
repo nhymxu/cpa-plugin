@@ -69,7 +69,7 @@ const abiVersion uint32 = 1
 
 // pluginVersion is injected by CI via ldflags -X at build time.
 // The fallback is the local-development default.
-var pluginVersion = "0.1.6"
+var pluginVersion = "0.1.7"
 
 // OpenCode API constants
 const (
