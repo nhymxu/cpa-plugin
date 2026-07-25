@@ -67,6 +67,10 @@ import (
 
 const abiVersion uint32 = 1
 
+// pluginVersion is injected by CI via ldflags -X at build time.
+// The fallback is the local-development default.
+var pluginVersion = "0.1.6"
+
 // OpenCode API constants
 const (
 	opencodeBaseURL     = "https://opencode.ai"
@@ -366,7 +370,7 @@ func handleRegister() ([]byte, error) {
 		SchemaVersion: 1,
 		Metadata: metadata{
 			Name:             "opencode-free",
-			Version:          "0.1.6",
+			Version:          pluginVersion,
 			Author:           "nhymxu",
 			GitHubRepository: "https://github.com/nhymxu/cpa-plugin",
 			Logo:             "",
