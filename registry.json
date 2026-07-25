@@ -12,7 +12,29 @@
       "tags": ["free", "opencode", "provider"],
       "install": {
         "type": "direct",
-        "artifacts": []
+        "artifacts": [
+          {
+            "goos": "darwin",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.6/opencode-free_0.1.6_darwin_arm64.zip",
+            "sha256": "6057bdd98147b9dce0707b09a0ab0cfcfee40dc628d24fa3a7887b5eb147717b",
+            "size": 770753
+          },
+          {
+            "goos": "linux",
+            "goarch": "amd64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.6/opencode-free_0.1.6_linux_amd64.zip",
+            "sha256": "781e2473ab62cf521306644bef74def1f9341e011a261b0de9111d2a3d246ff3",
+            "size": 786342
+          },
+          {
+            "goos": "linux",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.6/opencode-free_0.1.6_linux_arm64.zip",
+            "sha256": "8117e3b2c50ab95afdff15f9d88e79d2476e1163615f3211206615c9c67855f1",
+            "size": 735734
+          }
+        ]
       }
     }
   ]
