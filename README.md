@@ -31,10 +31,12 @@ Free Claude models via [OpenCode](https://opencode.ai) — no authentication req
 
 **Models:** Claude Sonnet 4.7, Haiku 4.5, Opus 4.8, Fable 5
 
-### MiMo Free
+### MiMo Free (v0.1.2)
 
 Free Xiaomi MiMo models — no authentication required. Bootstraps a short-lived JWT
-from the free-tier endpoint automatically (cached ~1h, auto-retried on 401).
+from the free-tier endpoint automatically (cached, auto-retried on 401/403), rotating
+a Chrome-like User-Agent and injecting the required system marker to pass MiMo's
+anti-abuse gate.
 
 **Models:** MiMo Auto, MiMo V2.5 Pro, MiMo V2.5, MiMo V2 Pro, MiMo V2 Omni, MiMo V2 Flash
 
