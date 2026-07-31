@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        plugin-dir: [opencode-free]
+        plugin-dir: [opencode-free, mimo-free]
     defaults:
       run:
         working-directory: ${{ matrix.plugin-dir }}

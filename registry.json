@@ -36,6 +36,20 @@
           }
         ]
       }
+    },
+    {
+      "id": "mimo-free",
+      "name": "MiMo Free",
+      "description": "Free Xiaomi MiMo models via free-tier bootstrap, no authentication required",
+      "author": "nhymxu",
+      "version": "0.1.0",
+      "homepage": "https://github.com/nhymxu/cpa-plugin",
+      "license": "MIT",
+      "tags": ["free", "mimo", "xiaomi", "provider"],
+      "install": {
+        "type": "direct",
+        "artifacts": []
+      }
     }
   ]
 }

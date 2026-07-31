@@ -15,7 +15,10 @@ A custom plugin store for [CLIProxyAPI](https://github.com/router-for-me/CLIProx
 ├── Makefile               # version bump / tag / release helpers
 ├── scripts/
 │   └── bump_version.py    # updates registry.json version field
-└── opencode-free/         # OpenCode Free plugin source
+├── opencode-free/         # OpenCode Free plugin source
+│   ├── main.go            # Go plugin (buildmode=c-shared)
+│   ├── go.mod
+└── mimo-free/             # MiMo Free plugin source
     ├── main.go            # Go plugin (buildmode=c-shared)
     ├── go.mod
 ```
@@ -27,6 +30,13 @@ A custom plugin store for [CLIProxyAPI](https://github.com/router-for-me/CLIProx
 Free Claude models via [OpenCode](https://opencode.ai) — no authentication required.
 
 **Models:** Claude Sonnet 4.7, Haiku 4.5, Opus 4.8, Fable 5
+
+### MiMo Free
+
+Free Xiaomi MiMo models — no authentication required. Bootstraps a short-lived JWT
+from the free-tier endpoint automatically (cached ~1h, auto-retried on 401).
+
+**Models:** MiMo Auto, MiMo V2.5 Pro, MiMo V2.5, MiMo V2 Pro, MiMo V2 Omni, MiMo V2 Flash
 
 ### Install from Marketplace
 
@@ -45,6 +55,9 @@ Then install via Management UI or API:
 ```bash
 curl -X POST -H "x-api-key: your-key" \
   http://localhost:8317/v0/management/plugin-store/opencode-free/install
+
+curl -X POST -H "x-api-key: your-key" \
+  http://localhost:8317/v0/management/plugin-store/mimo-free/install
 ```
 
 ### Manual Install
@@ -65,6 +78,8 @@ go build -buildmode=c-shared -o opencode-free.dylib .
 # Linux AMD64
 GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o opencode-free.so .
 ```
+
+Same for `mimo-free`, using its own directory name for the output file.
 
 ## Release
 
