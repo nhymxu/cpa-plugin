@@ -57,7 +57,29 @@
       ],
       "install": {
         "type": "direct",
-        "artifacts": []
+        "artifacts": [
+          {
+            "goos": "darwin",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/mimo-free-0.1.2/mimo-free_0.1.2_darwin_arm64.zip",
+            "sha256": "c1aa170b85a85ba6e92a48885141d0283945fba08c74ba63dd0d3a3be3052f0e",
+            "size": 831787
+          },
+          {
+            "goos": "linux",
+            "goarch": "amd64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/mimo-free-0.1.2/mimo-free_0.1.2_linux_amd64.zip",
+            "sha256": "c141e36daa8506c5be47b014181a1daad803c824dee13edd2309580c0e551241",
+            "size": 857874
+          },
+          {
+            "goos": "linux",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/mimo-free-0.1.2/mimo-free_0.1.2_linux_arm64.zip",
+            "sha256": "539a996bb299071502b47f992519980d45ead159f9efa693c8dcefb8959aea04",
+            "size": 799571
+          }
+        ]
       }
     }
   ]
