@@ -46,7 +46,7 @@
       "name": "MiMo Free",
       "description": "Free Xiaomi MiMo models via free-tier bootstrap, no authentication required",
       "author": "nhymxu",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "homepage": "https://github.com/nhymxu/cpa-plugin",
       "license": "MIT",
       "tags": [
