@@ -204,6 +204,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          # Default clean=true runs `git clean -ffdx`, which would wipe the
+          # artifacts/ and release-assets/ dirs built earlier in this job.
+          clean: false
 
       - name: Update registry.json with direct install artifacts
         run: |
