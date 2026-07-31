@@ -46,7 +46,7 @@
       "name": "MiMo Free",
       "description": "Free Xiaomi MiMo models via free-tier bootstrap, no authentication required",
       "author": "nhymxu",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "homepage": "https://github.com/nhymxu/cpa-plugin",
       "license": "MIT",
       "tags": [
@@ -57,29 +57,7 @@
       ],
       "install": {
         "type": "direct",
-        "artifacts": [
-          {
-            "goos": "darwin",
-            "goarch": "arm64",
-            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/mimo-free-0.1.0/mimo-free_0.1.0_darwin_arm64.zip",
-            "sha256": "db3521da4154f98da2424dd556056174064f96c01b274e27a27473c28d122b95",
-            "size": 831789
-          },
-          {
-            "goos": "linux",
-            "goarch": "amd64",
-            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/mimo-free-0.1.0/mimo-free_0.1.0_linux_amd64.zip",
-            "sha256": "70cd27fefd61352b72b37fd67b1d66384f53476c1aff8edbee7f5abab34f4258",
-            "size": 857868
-          },
-          {
-            "goos": "linux",
-            "goarch": "arm64",
-            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/mimo-free-0.1.0/mimo-free_0.1.0_linux_arm64.zip",
-            "sha256": "b112b064009def370d9975d13fa4921b1d42979e6132579528c6780b72091aea",
-            "size": 799575
-          }
-        ]
+        "artifacts": []
       }
     }
   ]

@@ -76,7 +76,7 @@ const abiVersion uint32 = 1
 
 // pluginVersion is injected by CI via ldflags -X at build time.
 // The fallback is the local-development default.
-var pluginVersion = "0.1.0"
+var pluginVersion = "0.1.1"
 
 // MiMo Free API constants. The free tier has no API key: a bootstrap call
 // exchanges a client hash for a short-lived JWT, which is then used to call

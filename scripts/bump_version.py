@@ -16,39 +16,22 @@ def main():
         sys.exit(f"invalid version '{version}', expected semver x.y.z")
 
     with open(REGISTRY_PATH) as f:
-        text = f.read()
+        data = json.load(f)
 
-    data = json.loads(text)
-    idx = next((i for i, p in enumerate(data["plugins"]) if p["id"] == plugin_id), None)
-    if idx is None:
+    plugin = next((p for p in data["plugins"] if p["id"] == plugin_id), None)
+    if plugin is None:
         sys.exit(f"plugin '{plugin_id}' not found in {REGISTRY_PATH}")
 
-    # Find the plugin block start
-    id_match = re.search(r'"id"\s*:\s*"' + re.escape(plugin_id) + r'"', text)
-    if not id_match:
-        sys.exit(f"plugin id '{plugin_id}' not found in text")
+    old_version = plugin["version"]
+    plugin["version"] = version
 
-    # Update version
-    version_match = re.search(r'("version"\s*:\s*")([^"]*)(")', text[id_match.end():])
-    if not version_match:
-        sys.exit(f"no version field found for plugin '{plugin_id}'")
-    start = id_match.end() + version_match.start(2)
-    end = id_match.end() + version_match.end(2)
-    old_version = text[start:end]
-
-    # Replace version in text
-    text = text[:start] + version + text[end:]
-
-    # If there's an existing install.artifacts block, clear it so CI fills it in
-    install_match = re.search(
-        r'("install"\s*:\s*\{\s*"type"\s*:\s*"direct"\s*,\s*"artifacts"\s*:\s*)\[[^\]]*\](\s*\})',
-        text,
-    )
-    if install_match:
-        text = text[: install_match.start(1)] + install_match.group(1) + "[]" + install_match.group(2)
+    # Reset this plugin's own install.artifacts so CI fills it in for the new version.
+    if "install" in plugin and "artifacts" in plugin["install"]:
+        plugin["install"]["artifacts"] = []
 
     with open(REGISTRY_PATH, "w") as f:
-        f.write(text)
+        json.dump(data, f, indent=2)
+        f.write("\n")
 
     print(f"{plugin_id}: {old_version} -> {version}")
 
