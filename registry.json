@@ -18,7 +18,29 @@
       ],
       "install": {
         "type": "direct",
-        "artifacts": []
+        "artifacts": [
+          {
+            "goos": "linux",
+            "goarch": "amd64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.8/opencode-free_0.1.8_linux_amd64.zip",
+            "sha256": "30abbd49fbe93d950193a8a6bb52b9c5f46141cc124939b4e6c534f759b9a56c",
+            "size": 837444
+          },
+          {
+            "goos": "linux",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.8/opencode-free_0.1.8_linux_arm64.zip",
+            "sha256": "540c0a45113a2e1a811ccda600181272f387451f996036321be7a69c5e225f51",
+            "size": 783752
+          },
+          {
+            "goos": "darwin",
+            "goarch": "arm64",
+            "url": "https://github.com/nhymxu/cpa-plugin/releases/download/opencode-free-0.1.8/opencode-free_0.1.8_darwin_arm64.zip",
+            "sha256": "cd4891b1b2496fd950fc2158d19ed570083b4480e6467ab1efe787505a4b6c3e",
+            "size": 817370
+          }
+        ]
       }
     },
     {
