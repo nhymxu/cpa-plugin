@@ -56,12 +56,14 @@ static void free_host_buffer(void* ptr, size_t len) {
 import "C"
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unsafe"
 )
 
@@ -69,7 +71,7 @@ const abiVersion uint32 = 1
 
 // pluginVersion is injected by CI via ldflags -X at build time.
 // The fallback is the local-development default.
-var pluginVersion = "0.1.7"
+var pluginVersion = "0.1.8"
 
 // OpenCode API constants
 const (
@@ -78,6 +80,30 @@ const (
 	opencodeChatURL     = "/zen/v1/chat/completions"
 	opencodeMessagesURL = "/zen/v1/messages"
 )
+
+// Session mapping constants
+const (
+	maxRequestPayloadBytes = 64 << 20
+	maxSessionIDBytes      = 1024
+
+	targetSessionHeader = "X-Opencode-Session"
+	targetClientHeader  = "X-Opencode-Client"
+	defaultClientValue  = "cliproxy"
+)
+
+// sessionSources lists downstream client headers that carry a stable
+// per-conversation session id, in priority order.
+var sessionSources = []string{
+	"Session-Id",                    // codex CLI
+	"Session_id",                    // codex CLI underscore variant (EqualFold misses _ vs -)
+	"Thread-Id",                     // codex CLI thread = conversation
+	"Thread_id",                     // underscore variant
+	"X-Claude-Code-Session-Id",      // claude code
+	"X-DeepSeek-Harness-Session-Id", // dsh / deepseek-harness native provider
+	"X-Session-Affinity",            // dsh pi-ai (anthropic-messages, openai-completions)
+	"X-Session-Id",                  // generic (opencode-ish clients, aicoding-proxy default)
+	"X-Client-Request-Id",           // last resort
+}
 
 // JSON envelope matching plugin ABI
 type envelope struct {
@@ -115,12 +141,13 @@ type configField struct {
 }
 
 type capabilities struct {
-	ModelRegistrar       bool     `json:"model_registrar"`
-	ModelProvider        bool     `json:"model_provider"`
-	ModelRouter          bool     `json:"model_router"`
-	Executor             bool     `json:"executor"`
-	ExecutorModelScope   string   `json:"executor_model_scope"`
-	ExecutorInputFormats []string `json:"executor_input_formats,omitempty"`
+	ModelRegistrar        bool     `json:"model_registrar"`
+	ModelProvider         bool     `json:"model_provider"`
+	ModelRouter           bool     `json:"model_router"`
+	Executor              bool     `json:"executor"`
+	RequestInterceptor    bool     `json:"request_interceptor"`
+	ExecutorModelScope    string   `json:"executor_model_scope"`
+	ExecutorInputFormats  []string `json:"executor_input_formats,omitempty"`
 	ExecutorOutputFormats []string `json:"executor_output_formats,omitempty"`
 }
 
@@ -139,17 +166,18 @@ type modelRouteResponse struct {
 
 // Executor RPC types
 type executorRequest struct {
-	AuthID          string            `json:"auth_id"`
-	AuthProvider    string            `json:"auth_provider"`
-	Model           string            `json:"model"`
-	Format          string            `json:"format"`
-	Stream          bool              `json:"stream"`
-	Alt             string            `json:"alt,omitempty"`
+	AuthID          string              `json:"auth_id"`
+	AuthProvider    string              `json:"auth_provider"`
+	Model           string              `json:"model"`
+	Format          string              `json:"format"`
+	Stream          bool                `json:"stream"`
+	Alt             string              `json:"alt,omitempty"`
 	Headers         map[string][]string `json:"headers,omitempty"`
-	SourceFormat    string            `json:"source_format"`
-	Payload         json.RawMessage   `json:"payload"`
-	OriginalRequest json.RawMessage   `json:"original_request"`
-	StorageJSON     json.RawMessage   `json:"storage_json,omitempty"`
+	SourceFormat    string              `json:"source_format"`
+	Payload         json.RawMessage     `json:"payload"`
+	OriginalRequest json.RawMessage     `json:"original_request"`
+	StorageJSON     json.RawMessage     `json:"storage_json,omitempty"`
+	Metadata        map[string]any      `json:"metadata,omitempty"`
 }
 
 type executorStreamChunk struct {
@@ -158,8 +186,20 @@ type executorStreamChunk struct {
 }
 
 type executorStreamResponse struct {
-	Headers map[string][]string    `json:"headers,omitempty"`
+	Headers map[string][]string   `json:"headers,omitempty"`
 	Chunks  []executorStreamChunk `json:"chunks,omitempty"`
+}
+
+// Interceptor types
+type interceptRequest struct {
+	RequestID string              `json:"RequestID"`
+	Headers   map[string][]string `json:"Headers"`
+	Metadata  map[string]any      `json:"Metadata"`
+}
+
+type interceptResponse struct {
+	Headers      map[string][]string `json:"Headers"`
+	ClearHeaders []string            `json:"ClearHeaders"`
 }
 
 // Host HTTP bridge types
@@ -185,8 +225,8 @@ type hostHTTPStreamReadResponse struct {
 // requestBuffer holds the raw JSON from the last host call,
 // so executor methods can decode it.
 var (
-	mu            sync.Mutex
-	requestBuf    []byte
+	mu         sync.Mutex
+	requestBuf []byte
 )
 
 func main() {}
@@ -205,31 +245,50 @@ func cliproxy_plugin_init(host *C.cliproxy_host_api, plugin *C.cliproxy_plugin_a
 }
 
 //export cliproxyPluginCall
-func cliproxyPluginCall(method *C.char, request *C.uint8_t, requestLen C.size_t, response *C.cliproxy_buffer) C.int {
-	if response != nil {
-		response.ptr = nil
-		response.len = 0
+func cliproxyPluginCall(method *C.char, request *C.uint8_t, requestLen C.size_t, response *C.cliproxy_buffer) (status C.int) {
+	status = 1
+	if response == nil {
+		return 1
 	}
+	response.ptr = nil
+	response.len = 0
+	defer func() {
+		if recover() != nil {
+			writeResponse(response, errorEnvelope("plugin_panic", "plugin call failed"))
+			status = 1
+		}
+	}()
 	if method == nil {
 		writeResponse(response, errorEnvelope("invalid_method", "method is required"))
 		return 1
 	}
-
-	methodStr := C.GoString(method)
-
-	// Capture request bytes for executor methods
-	var reqBytes []byte
-	if request != nil && requestLen > 0 {
-		reqBytes = C.GoBytes(unsafe.Pointer(request), C.int(requestLen))
-	}
-
-	raw, errHandle := handleMethod(methodStr, reqBytes)
-	if errHandle != nil {
-		writeResponse(response, errorEnvelope("plugin_error", errHandle.Error()))
+	if !requestPayloadSizeAllowed(uint64(requestLen)) {
+		writeResponse(response, errorEnvelope("invalid_request", "request payload exceeds size limit"))
 		return 1
 	}
+	var payload []byte
+	if requestLen > 0 {
+		if request == nil {
+			writeResponse(response, errorEnvelope("invalid_request", "request buffer is required"))
+			return 1
+		}
+		payload = C.GoBytes(unsafe.Pointer(request), C.int(requestLen))
+	}
+	raw, callStatus := processPluginCall(C.GoString(method), payload)
 	writeResponse(response, raw)
-	return 0
+	return C.int(callStatus)
+}
+
+func processPluginCall(method string, payload []byte) ([]byte, int) {
+	raw, errHandle := handleMethod(method, payload)
+	if errHandle != nil {
+		return errorEnvelope("plugin_error", errHandle.Error()), 1
+	}
+	return raw, 0
+}
+
+func requestPayloadSizeAllowed(size uint64) bool {
+	return size <= maxRequestPayloadBytes
 }
 
 //export cliproxyPluginFree
@@ -319,6 +378,201 @@ func fetchFreeModels() ([]map[string]any, error) {
 	return out, nil
 }
 
+// Session resolution helpers
+func headerValue(headers map[string][]string, name string) (string, bool) {
+	matched := false
+	selected := ""
+	for key, values := range headers {
+		if !strings.EqualFold(key, name) {
+			continue
+		}
+		matched = true
+		if len(values) == 0 {
+			return "", true
+		}
+		for _, raw := range values {
+			value, valid := normalizeSessionID(raw)
+			if !valid {
+				return "", true
+			}
+			if selected == "" {
+				selected = value
+				continue
+			}
+			if selected != value {
+				return "", true
+			}
+		}
+	}
+	if !matched {
+		return "", false
+	}
+	return selected, true
+}
+
+func headerHasValue(headers map[string][]string, name string) bool {
+	for key, values := range headers {
+		if !strings.EqualFold(key, name) {
+			continue
+		}
+		for _, value := range values {
+			if strings.TrimSpace(value) != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func normalizeSessionID(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > maxSessionIDBytes {
+		return "", false
+	}
+	for _, char := range value {
+		if unicode.IsControl(char) {
+			return "", false
+		}
+	}
+	return value, true
+}
+
+func sessionFallback(metadata map[string]any) string {
+	if metadata == nil {
+		return ""
+	}
+	v, ok := metadata["canonical_session_id"]
+	if !ok {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	value, valid := normalizeSessionID(s)
+	if !valid {
+		return ""
+	}
+	return value
+}
+
+func resolveSession(headers map[string][]string, metadata map[string]any) string {
+	if headers != nil {
+		// Client already sent x-opencode-session (e.g. real opencode CLI):
+		// never override, their value is authoritative.
+		if v, exists := headerValue(headers, targetSessionHeader); exists && v != "" {
+			return v
+		}
+		for _, src := range sessionSources {
+			if v, exists := headerValue(headers, src); exists {
+				if v == "" {
+					return ""
+				}
+				return v
+			}
+		}
+	}
+	if metadata != nil {
+		if s := sessionFallback(metadata); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func generateFallbackSessionID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("cpa-%d", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("cpa-%x", b)
+}
+
+func interceptHeaders(payload []byte) ([]byte, error) {
+	empty, errEmpty := okEnvelopeJSON(`{"Headers":{}}`)
+	if errEmpty != nil {
+		return nil, errEmpty
+	}
+	var req interceptRequest
+	if len(payload) > 0 {
+		if errDecode := json.Unmarshal(payload, &req); errDecode != nil {
+			return nil, errDecode
+		}
+	}
+	if req.Headers == nil {
+		return empty, nil
+	}
+	// Client already sent x-opencode-session (e.g. real opencode CLI):
+	// never override, their value is authoritative.
+	if _, exists := headerValue(req.Headers, targetSessionHeader); exists {
+		return empty, nil
+	}
+	var session string
+	for _, src := range sessionSources {
+		if v, exists := headerValue(req.Headers, src); exists {
+			if v == "" {
+				return empty, nil
+			}
+			session = v
+			break
+		}
+	}
+	if session == "" {
+		session = sessionFallback(req.Metadata)
+	}
+	if session == "" {
+		return empty, nil
+	}
+	out := map[string][]string{targetSessionHeader: {session}}
+	// Identify the proxy only when the client didn't identify itself.
+	if !headerHasValue(req.Headers, targetClientHeader) {
+		out[targetClientHeader] = []string{defaultClientValue}
+	}
+	resp := interceptResponse{Headers: out}
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+	return okEnvelopeRaw(respBytes), nil
+}
+
+func buildOutboundHeaders(headers map[string][]string, metadata map[string]any, accept string) map[string][]string {
+	out := map[string][]string{
+		"Content-Type":  {"application/json"},
+		"Authorization": {"Bearer public"},
+		"Accept":        {accept},
+	}
+
+	// Resolve x-opencode-client
+	if headers != nil && headerHasValue(headers, targetClientHeader) {
+		for key, values := range headers {
+			if strings.EqualFold(key, targetClientHeader) {
+				for _, v := range values {
+					if trimmed := strings.TrimSpace(v); trimmed != "" {
+						out[targetClientHeader] = []string{trimmed}
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+	if _, ok := out[targetClientHeader]; !ok {
+		out[targetClientHeader] = []string{"desktop"}
+	}
+
+	// Resolve x-opencode-session
+	session := resolveSession(headers, metadata)
+	if session == "" {
+		session = generateFallbackSessionID()
+	}
+	if session != "" {
+		out[targetSessionHeader] = []string{session}
+	}
+
+	return out
+}
+
 func handleMethod(method string, reqBody []byte) ([]byte, error) {
 	// Store request body for executor methods
 	mu.Lock()
@@ -328,6 +582,8 @@ func handleMethod(method string, reqBody []byte) ([]byte, error) {
 	switch method {
 	case "plugin.register", "plugin.reconfigure":
 		return handleRegister()
+	case "request.intercept_before", "request.intercept_after":
+		return interceptHeaders(reqBody)
 	case "model.register":
 		return handleModelRegister()
 	case "model.static":
@@ -377,13 +633,14 @@ func handleRegister() ([]byte, error) {
 			ConfigFields:     nil,
 		},
 		Capabilities: capabilities{
-			ModelRegistrar:       true,
-			ModelProvider:        true,
-			ModelRouter:          true,
-			Executor:             true,
-			ExecutorModelScope:   "both",
-			ExecutorInputFormats: []string{"chat-completions"},
-			ExecutorOutputFormats:  []string{"chat-completions"},
+			ModelRegistrar:        true,
+			ModelProvider:         true,
+			ModelRouter:           true,
+			Executor:              true,
+			RequestInterceptor:    true,
+			ExecutorModelScope:    "both",
+			ExecutorInputFormats:  []string{"chat-completions"},
+			ExecutorOutputFormats: []string{"chat-completions"},
 		},
 	}
 	raw, err := json.Marshal(reg)
@@ -452,16 +709,13 @@ func handleExecute() ([]byte, error) {
 
 	chatURL := selectChatURL(req.Format, req.SourceFormat)
 
+	outHeaders := buildOutboundHeaders(req.Headers, req.Metadata, "application/json")
+
 	sendReq := hostHTTPRequest{
-		Method: "POST",
-		URL:    opencodeBaseURL + chatURL,
-		Headers: map[string][]string{
-			"Content-Type":      {"application/json"},
-			"Authorization":     {"Bearer public"},
-			"x-opencode-client": {"desktop"},
-			"Accept":            {"application/json"},
-		},
-		Body: payload,
+		Method:  "POST",
+		URL:     opencodeBaseURL + chatURL,
+		Headers: outHeaders,
+		Body:    payload,
 	}
 
 	resp, err := callHostHTTP(sendReq)
@@ -481,16 +735,13 @@ func handleExecuteStream() ([]byte, error) {
 
 	chatURL := selectChatURL(req.Format, req.SourceFormat)
 
+	outHeaders := buildOutboundHeaders(req.Headers, req.Metadata, "text/event-stream")
+
 	sendReq := hostHTTPRequest{
-		Method: "POST",
-		URL:    opencodeBaseURL + chatURL,
-		Headers: map[string][]string{
-			"Content-Type":      {"application/json"},
-			"Authorization":     {"Bearer public"},
-			"x-opencode-client": {"desktop"},
-			"Accept":            {"text/event-stream"},
-		},
-		Body: payload,
+		Method:  "POST",
+		URL:     opencodeBaseURL + chatURL,
+		Headers: outHeaders,
+		Body:    payload,
 	}
 
 	return doStream(sendReq)

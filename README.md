@@ -25,9 +25,13 @@ A custom plugin store for [CLIProxyAPI](https://github.com/router-for-me/CLIProx
 
 ## Plugins
 
-### OpenCode Free
+### OpenCode Free (v0.1.8)
 
 Free Claude models via [OpenCode](https://opencode.ai) — no authentication required.
+
+- Extracts and maps downstream client session identifiers (`Session-Id`, `Thread-Id`, `X-Claude-Code-Session-Id`, `X-DeepSeek-Harness-Session-Id`, `X-Session-Affinity`, `X-Session-Id`, `X-Client-Request-Id`) or host `canonical_session_id` into `X-Opencode-Session` upstream to preserve prompt cache affinity and sticky routing (preventing OpenCode Zen `MissingSessionID` 400 errors).
+- Provides `request_interceptor` capability (`request.intercept_before` / `request.intercept_after`) to intercept and inject session headers across requests.
+- Hardened input handling: 64 MiB payload envelope gate, 1024-byte session id limits, Unicode control character validation, case-variant duplicate handling, and ABI boundary panic recovery.
 
 **Models:** Claude Sonnet 4.7, Haiku 4.5, Opus 4.8, Fable 5
 
